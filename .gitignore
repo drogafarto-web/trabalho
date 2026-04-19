@@ -1,0 +1,25 @@
+# ============================================================================
+#  Root .gitignore
+# ============================================================================
+#  O app em si (app/) e suas dependências têm seus próprios .gitignore.
+#  Este arquivo cobre apenas a raiz do repositório.
+
+# V1 de referência (app antigo) — nunca commitamos
+/trabalho/
+
+# Ambientes locais
+.env
+.env.local
+.env.*.local
+
+# Caches e OS junk
+.cache/
+*.log
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp

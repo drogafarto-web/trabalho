@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// =============================================================================
+//  Controle de Trabalhos — Storage Security Rules
+// =============================================================================
+//  Fase 0: DENY ALL. Upload de trabalhos liberado na Fase 4 (F-AL-01).
+// =============================================================================
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isProfessor() {
+      return isSignedIn()
+        && request.auth.token.role == 'professor';
+    }
+
+    function isStudent() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isValidFileSize(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024;
+    }
+
+    function isAllowedContentType() {
+      return request.resource.contentType.matches('application/pdf')
+          || request.resource.contentType.matches('image/jpeg')
+          || request.resource.contentType.matches('image/png');
+    }
+
+    // -------------------------------------------------------------------------
+    //  /submissions/{submissionId}/original.{ext}
+    //  Liberado na Fase 4. Deny por enquanto.
+    // -------------------------------------------------------------------------
+    match /submissions/{submissionId}/{allPaths=**} {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  Catch-all deny
+    // -------------------------------------------------------------------------
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>controle.ia — Controle de Trabalhos</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="browser-window.jsx"></script>
+<script type="text/babel" src="ProfessorShell.jsx"></script>
+<script type="text/babel" src="StudentForm.jsx"></script>
+<script type="text/babel" src="ProfessorDashboard.jsx"></script>
+<script type="text/babel" src="ProfessorOther.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "screen": "student",
+  "studentStep": 0,
+  "studentFileState": "success",
+  "dashAlert": true,
+  "dashDrawer": false,
+  "alunosEmpty": false,
+  "alunosImport": false,
+  "disciplinaModalTab": -1,
+  "reportsView": "aluno",
+  "loginUnauthorized": false
+}/*EDITMODE-END*/;
+
+const SCREENS = [
+  { group: 'Aluno',     id: 'student',      label: 'Entrega (mobile)' },
+  { group: 'Professor', id: 'login',        label: 'Login' },
+  { group: 'Professor', id: 'dashboard',    label: 'Trabalhos' },
+  { group: 'Professor', id: 'disciplinas',  label: 'Disciplinas' },
+  { group: 'Professor', id: 'alunos',       label: 'Alunos' },
+  { group: 'Professor', id: 'reports',      label: 'Relatórios' },
+];
+
+function App() {
+  const saved = (() => {
+    try { return JSON.parse(localStorage.getItem('ctrl-tweaks') || '{}'); }
+    catch { return {}; }
+  })();
+  const [state, setState] = useState({ ...TWEAK_DEFAULTS, ...saved });
+  const [tweaksOpen, setTweaksOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('ctrl-tweaks', JSON.stringify(state));
+  }, [state]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.data || typeof e.data !== 'object') return;
+      if (e.data.type === '__activate_edit_mode') setTweaksOpen(true);
+      if (e.data.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const set = (patch) => {
+    const next = { ...state, ...patch };
+    setState(next);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: patch }, '*');
+  };
+
+  const screen = state.screen;
+
+  return (
+    <div className="app">
+      {/* Global navigation */}
+      <nav className="app-nav">
+        <div className="brand">
+          <div className="logo">c</div>
+          <div className="name">controle<span>.ia</span></div>
+        </div>
+        <div className="screen-switcher">
+          {['Aluno', 'Professor'].map(group => (
+            <React.Fragment key={group}>
+              <div className="group-label">{group}</div>
+              {SCREENS.filter(s => s.group === group).map(s => (
+                <button
+                  key={s.id}
+                  className={screen === s.id ? 'active' : ''}
+                  onClick={() => set({ screen: s.id })}
+                >{s.label}</button>
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="spacer" />
+        <div className="meta">
+          <span className="dot" />
+          <span>Protótipo interativo · v1.4</span>
+        </div>
+      </nav>
+
+      {/* Stage */}
+      <StageFor screen={screen} state={state} set={set} />
+
+      {/* Tweaks panel */}
+      <TweaksPanel open={tweaksOpen} onClose={() => setTweaksOpen(false)} screen={screen} state={state} set={set} />
+    </div>
+  );
+}
+
+function StageFor({ screen, state, set }) {
+  if (screen === 'student') {
+    return (
+      <div className="screen-stage centered">
+        <div style={{ position: 'relative' }}>
+          <div className="stage-label">390 × 844 · iPhone 15 · fluxo aluno</div>
+          <IOSDevice width={390} height={780} dark={true}>
+            <div style={{ width: '100%', height: '100%', background: 'var(--bg)', display: 'flex', flexDirection: 'column', paddingTop: 60 }}>
+              <StudentFormScreen
+                forcedState={state.studentFileState}
+                forcedStep={state.studentStep}
+              />
+            </div>
+          </IOSDevice>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'login') {
+    return (
+      <div className="screen-stage centered">
+        <div style={{ position: 'relative', width: '100%', maxWidth: 1360 }}>
+          <div className="stage-label">Login — 1440×900</div>
+          <ChromeWindow
+            tabs={[{ title: 'controle.ia — Entrar' }]}
+            url="controle.ia/entrar"
+            width="100%" height={760}
+          >
+            <div style={{ height: '100%', background: 'var(--bg)' }}>
+              <LoginScreen unauthorized={state.loginUnauthorized} />
+            </div>
+          </ChromeWindow>
+        </div>
+      </div>
+    );
+  }
+
+  // Professor screens (dashboard, disciplinas, alunos, reports)
+  return (
+    <div className="screen-stage">
+      <div style={{ position: 'relative', width: '100%', maxWidth: 1360 }}>
+        <div className="stage-label">{screenLabel(screen)} — 1440×900 · desktop</div>
+        <ChromeWindow
+          tabs={[{ title: `controle.ia — ${screenLabel(screen)}` }]}
+          url={`controle.ia/${screen}`}
+          width="100%" height={840}
+        >
+          <div style={{ display: 'flex', height: '100%', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-body)' }}>
+            <ProfSidebar active={screen} onNav={(id) => set({ screen: id })} />
+            <main style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+              {screen === 'dashboard' && (
+                <DashboardScreen
+                  showAlert={state.dashAlert}
+                  openDrawer={state.dashDrawer ? 'TRB-2K6A-7F3' : null}
+                />
+              )}
+              {screen === 'disciplinas' && (
+                <DisciplinasScreen modalInitialTab={state.disciplinaModalTab >= 0 ? state.disciplinaModalTab : undefined} />
+              )}
+              {screen === 'alunos' && (
+                <AlunosScreen emptyState={state.alunosEmpty} importOpen={state.alunosImport} />
+              )}
+              {screen === 'reports' && (
+                <ReportsScreen view={state.reportsView} />
+              )}
+            </main>
+          </div>
+        </ChromeWindow>
+      </div>
+    </div>
+  );
+}
+
+function screenLabel(id) {
+  return {
+    dashboard: 'Trabalhos',
+    disciplinas: 'Disciplinas',
+    alunos: 'Alunos',
+    reports: 'Relatórios',
+  }[id] || id;
+}
+
+function TweaksPanel({ open, onClose, screen, state, set }) {
+  const Seg = ({ label, k, options }) => (
+    <div className="tweak-group">
+      <label>{label}</label>
+      <div className="tweak-seg">
+        {options.map(([val, lbl]) => (
+          <button
+            key={String(val)}
+            className={state[k] === val ? 'active' : ''}
+            onClick={() => set({ [k]: val })}
+          >{lbl}</button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`tweaks-panel ${open ? 'open' : ''}`}>
+      <div className="head">
+        <span>Tweaks · {screenLabel(screen) || screen}</span>
+        <button onClick={onClose} style={{ color: 'var(--text-3)' }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+        </button>
+      </div>
+      <div className="body">
+        {screen === 'student' && (
+          <>
+            <Seg label="Passo do formulário" k="studentStep" options={[[0, 'Identif.'], [1, 'Arquivo'], [2, 'Confirmar']]} />
+            <Seg label="Estado do upload" k="studentFileState" options={[['idle', 'Idle'], ['uploading', 'Enviando'], ['success', 'OK'], ['error', 'Erro']]} />
+          </>
+        )}
+        {screen === 'dashboard' && (
+          <>
+            <Seg label="Banner de integridade" k="dashAlert" options={[[true, 'Visível'], [false, 'Oculto']]} />
+            <Seg label="Drawer de detalhe" k="dashDrawer" options={[[false, 'Fechado'], [true, 'Aberto']]} />
+          </>
+        )}
+        {screen === 'disciplinas' && (
+          <Seg label="Modal de edição"
+               k="disciplinaModalTab"
+               options={[[-1, 'Fechado'], [0, 'Info'], [1, 'Rubrica'], [2, 'Pergs.'], [3, 'Custom']]} />
+        )}
+        {screen === 'alunos' && (
+          <>
+            <Seg label="Estado" k="alunosEmpty" options={[[false, 'Com alunos'], [true, 'Vazio']]} />
+            <Seg label="Modal importar" k="alunosImport" options={[[false, 'Fechado'], [true, 'Aberto']]} />
+          </>
+        )}
+        {screen === 'reports' && (
+          <Seg label="Visualização" k="reportsView" options={[['aluno', 'Aluno'], ['grupo', 'Grupo'], ['criterio', 'Critério']]} />
+        )}
+        {screen === 'login' && (
+          <Seg label="Cenário" k="loginUnauthorized" options={[[false, 'Entrada'], [true, 'Não autorizado']]} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

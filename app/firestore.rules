@@ -1,0 +1,126 @@
+rules_version = '2';
+
+// =============================================================================
+//  Controle de Trabalhos — Firestore Security Rules
+// =============================================================================
+//  Fase 0: DENY ALL por padrão. Cada coleção libera apenas o mínimo conforme
+//  avançamos nas fases (ver docs/01_spec.md e docs/04_schema_json.md).
+//
+//  Princípios:
+//    1. Nada é lido/escrito sem auth (exceto leituras deliberadamente públicas)
+//    2. Role é verificado via custom claim (request.auth.token.role)
+//    3. Ownership sempre checado server-side (não confiar no cliente)
+//    4. Regras são versionadas e têm testes em @firebase/rules-unit-testing
+// =============================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    //  Helpers
+    // -------------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isProfessor() {
+      return isSignedIn()
+        && request.auth.token.role == 'professor';
+    }
+
+    function isStudent() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isOwner(ownerUid) {
+      return isProfessor() && request.auth.uid == ownerUid;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    //  /professors/{uid}
+    //  Documento do professor. Escrita é feita pela Cloud Function
+    //  bootstrapProfessorClaim (Admin SDK, bypassa estas rules).
+    //  Leitura e atualização de preferências: apenas o dono.
+    // -------------------------------------------------------------------------
+    match /professors/{uid} {
+      allow get: if isProfessor() && request.auth.uid == uid;
+      allow list: if false;
+      allow create: if false;
+      allow update: if isProfessor()
+        && request.auth.uid == uid
+        && onlyAllowedFieldsUpdated(['preferences', 'lastLoginAt']);
+      allow delete: if false;
+    }
+
+    function onlyAllowedFieldsUpdated(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    // -------------------------------------------------------------------------
+    //  /disciplines/{id}
+    //  Liberado na Fase 2 (F-PR-04). Por enquanto: deny all.
+    // -------------------------------------------------------------------------
+    match /disciplines/{id} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  /students/{id}
+    //  Liberado na Fase 3 (F-PR-05). Por enquanto: deny all.
+    // -------------------------------------------------------------------------
+    match /students/{id} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  /discipline_students/{id}
+    //  Junction. Liberado na Fase 3.
+    // -------------------------------------------------------------------------
+    match /discipline_students/{id} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  /submissions/{id}
+    //  Liberado na Fase 4 (F-AL-01) + Fase 6 (F-PR-02/03). Deny por enquanto.
+    // -------------------------------------------------------------------------
+    match /submissions/{id} {
+      allow read, write: if false;
+
+      match /similarity_matches/{matchId} {
+        allow read, write: if false;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    //  /audit_log/{id}
+    //  Imutável. Escrita apenas via Admin SDK (Cloud Functions).
+    //  Leitura apenas professor autenticado.
+    // -------------------------------------------------------------------------
+    match /audit_log/{id} {
+      allow get, list: if isProfessor();
+      allow create, update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  /stats/{id}
+    //  Agregados pré-computados. Escrita via Cloud Function. Liberado Fase 6.
+    // -------------------------------------------------------------------------
+    match /stats/{id} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  Catch-all — nega qualquer coleção não listada acima.
+    //  Proteção contra coleções criadas acidentalmente.
+    // -------------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
