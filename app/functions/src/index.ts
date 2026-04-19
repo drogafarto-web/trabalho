@@ -19,6 +19,9 @@ export {
   gradeSubmission,
 } from './grading/grade-submission.js';
 
+// Fase 6 — download do arquivo para preview/review
+export { getSubmissionDownloadUrl } from './admin/get-download-url.js';
+
 // Fase 7: export { calculateSimilarity } from './similarity/calculate.js';
 
 export const healthCheck = onRequest(

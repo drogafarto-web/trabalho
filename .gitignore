@@ -7,6 +7,9 @@
 # V1 de referência (app antigo) — nunca commitamos
 /trabalho/
 
+# Claude Code local settings (bypass mode ativo, não compartilhar com time)
+/.claude/settings.local.json
+
 # Ambientes locais
 .env
 .env.local

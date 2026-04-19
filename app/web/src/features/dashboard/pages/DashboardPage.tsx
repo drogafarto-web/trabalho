@@ -1,62 +1,147 @@
+import { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
-import { env } from '@/lib/env';
+import { Select } from '@/shared/ui/Input';
+import { KpiCards } from '../components/KpiCards';
+import { SubmissionsTable } from '../components/SubmissionsTable';
+import { ReviewDrawer } from '../components/ReviewDrawer';
+import { useMyDisciplines } from '@/features/disciplines/lib/use-disciplines';
+import { useSubmissionsByDiscipline } from '../lib/use-submissions';
+import type { Submission, SubmissionStatus } from '@/core/domain/submission';
 
-/**
- * Dashboard stub — lista de trabalhos real vem na Fase 6 (F-PR-02).
- * Por enquanto mostra status do ambiente pra confirmar auth + rules.
- */
+const STATUS_FILTERS: Array<{ value: SubmissionStatus | ''; label: string }> = [
+  { value: '', label: 'Todos' },
+  { value: 'WAITING_FOR_AI', label: 'Aguardando IA' },
+  { value: 'AI_PROCESSING', label: 'Processando' },
+  { value: 'PENDING_REVIEW', label: 'Pendente revisão' },
+  { value: 'APPROVED', label: 'Aprovado' },
+  { value: 'REJECTED', label: 'Devolvido' },
+];
+
 export function DashboardPage() {
+  const { data: disciplines, isLoading: loadingDisciplines } = useMyDisciplines();
+  const [disciplineId, setDisciplineId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<SubmissionStatus | ''>('');
+  const [selected, setSelected] = useState<Submission | null>(null);
+
+  // Default: seleciona a primeira disciplina automaticamente
+  const effectiveDisciplineId =
+    disciplineId ?? (disciplines?.[0]?.id ?? null);
+
+  const { data: submissions, isLoading, error } = useSubmissionsByDiscipline(
+    effectiveDisciplineId,
+    statusFilter || undefined,
+  );
+
+  const currentDiscipline = disciplines?.find((d) => d.id === effectiveDisciplineId) ?? null;
+
   return (
     <AppShell>
       <header className="sticky top-0 z-10 border-b border-border bg-bg/80 backdrop-blur-md">
-        <div className="flex h-14 items-center px-8">
-          <h1 className="font-display text-lg font-semibold tracking-tight">Trabalhos</h1>
+        <div className="flex h-14 items-center justify-between gap-4 px-8">
+          <div className="flex items-baseline gap-3">
+            <h1 className="font-display text-lg font-semibold tracking-tight">Trabalhos</h1>
+            {submissions && (
+              <span className="font-mono text-xs text-text-muted tabular-nums">
+                {submissions.length.toString().padStart(2, '0')}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select
+              name="discipline"
+              value={effectiveDisciplineId ?? ''}
+              onChange={(e) => setDisciplineId(e.target.value || null)}
+              options={
+                disciplines?.map((d) => ({
+                  value: d.id,
+                  label: `${d.name} · ${d.semester}`,
+                })) ?? []
+              }
+              placeholder={loadingDisciplines ? 'Carregando…' : 'Selecione uma disciplina'}
+              className="min-w-[260px]"
+            />
+            <Select
+              name="status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as SubmissionStatus | '')}
+              options={STATUS_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+              className="min-w-[160px]"
+            />
+          </div>
         </div>
       </header>
 
-      <section className="px-8 py-10">
-        <div className="rounded-lg border border-border bg-bg-surface p-8">
-          <h2 className="font-display text-md font-semibold">Fase 2 em andamento</h2>
-          <p className="mt-2 text-sm text-text-secondary">
-            A lista de trabalhos entra na Fase 6. Por enquanto, vá para{' '}
-            <a
-              href="/disciplinas"
-              className="text-primary hover:text-primary-hover"
-            >
-              Disciplinas
-            </a>{' '}
-            e crie sua primeira rubrica.
-          </p>
+      <section className="space-y-6 px-8 py-6">
+        {!effectiveDisciplineId && (
+          <EmptyStateNoDiscipline hasDisciplines={(disciplines?.length ?? 0) > 0} />
+        )}
 
-          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <StatusCard label="Projeto" value={env.FIREBASE_PROJECT_ID} variant="primary" />
-            <StatusCard label="Modo" value={env.APP_ENV} variant="warning" />
-            <StatusCard label="Claim" value="role: professor" variant="success" />
-          </div>
-        </div>
+        {effectiveDisciplineId && (
+          <>
+            <KpiCards submissions={submissions} />
+
+            {error && (
+              <div className="flex items-center gap-2 rounded-sm border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {error.message}
+              </div>
+            )}
+
+            {isLoading ? (
+              <SkeletonRows />
+            ) : (
+              <SubmissionsTable
+                submissions={submissions}
+                onOpen={setSelected}
+                selectedId={selected?.id ?? null}
+              />
+            )}
+          </>
+        )}
       </section>
+
+      {selected && (
+        <ReviewDrawer
+          open
+          submission={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </AppShell>
   );
 }
 
-function StatusCard({
-  label,
-  value,
-  variant,
-}: {
-  label: string;
-  value: string;
-  variant: 'primary' | 'warning' | 'success';
-}) {
-  const colors = {
-    primary: 'text-primary',
-    warning: 'text-warning',
-    success: 'text-success',
-  };
+function EmptyStateNoDiscipline({ hasDisciplines }: { hasDisciplines: boolean }) {
   return (
-    <div className="rounded-sm border border-border bg-bg p-3">
-      <p className="text-xs uppercase tracking-wider text-text-muted">{label}</p>
-      <p className={`mt-1 font-mono text-xs ${colors[variant]}`}>{value}</p>
+    <div className="mt-20 flex flex-col items-center text-center">
+      <p className="text-sm text-text-secondary">
+        {hasDisciplines
+          ? 'Selecione uma disciplina para ver trabalhos.'
+          : 'Você ainda não tem disciplinas.'}
+      </p>
+      {!hasDisciplines && (
+        <a
+          href="/disciplinas"
+          className="mt-3 text-xs text-primary hover:text-primary-hover"
+        >
+          Criar primeira disciplina →
+        </a>
+      )}
+    </div>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <div className="space-y-1">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="h-11 animate-pulse rounded-sm border border-border bg-bg-surface"
+        />
+      ))}
     </div>
   );
 }
