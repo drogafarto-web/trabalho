@@ -51,3 +51,53 @@
     font-family: theme('fontFamily.mono');
   }
 }
+
+/* --------------------------------------------------------------------
+ * Layout de impressão A4 (relatórios oficiais)
+ * Tipografia serif, fundo branco, sem cores de interface.
+ * ------------------------------------------------------------------ */
+@media print {
+  @page {
+    size: A4;
+    margin: 1.5cm 1.2cm;
+  }
+
+  html, body {
+    background: white !important;
+    color: black !important;
+  }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+
+  /* Tabelas: bordas simples, sem hover, sem dark */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #999 !important;
+    padding: 4pt 6pt !important;
+    color: black !important;
+  }
+
+  thead {
+    display: table-header-group; /* repete header em cada página */
+  }
+
+  /* Evita quebra no meio de uma linha */
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Links sem estilo */
+  a {
+    color: black !important;
+    text-decoration: none !important;
+  }
+}

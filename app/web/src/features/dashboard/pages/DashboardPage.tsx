@@ -5,6 +5,7 @@ import { Select } from '@/shared/ui/Input';
 import { KpiCards } from '../components/KpiCards';
 import { SubmissionsTable } from '../components/SubmissionsTable';
 import { ReviewDrawer } from '../components/ReviewDrawer';
+import { IntegrityBanner } from '../components/IntegrityBanner';
 import { useMyDisciplines } from '@/features/disciplines/lib/use-disciplines';
 import { useSubmissionsByDiscipline } from '../lib/use-submissions';
 import type { Submission, SubmissionStatus } from '@/core/domain/submission';
@@ -81,6 +82,8 @@ export function DashboardPage() {
         {effectiveDisciplineId && (
           <>
             <KpiCards submissions={submissions} />
+
+            <IntegrityBanner submissions={submissions} onInspect={setSelected} />
 
             {error && (
               <div className="flex items-center gap-2 rounded-sm border border-danger/30 bg-danger/5 p-3 text-xs text-danger">

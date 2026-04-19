@@ -2,6 +2,7 @@ import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logger } from '../lib/logger.js';
 import { extractContent } from './extract-content.js';
 import { gradeWithGemini, GradingError } from './gemini-client.js';
+import { computeSimilarityForSubmission } from '../similarity/compute-similarity.js';
 
 /**
  * Core de correção — lê submissão + disciplina, chama Gemini, grava
@@ -107,7 +108,24 @@ export async function performGrading(params: {
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // 7. Audit log
+    // 7. Análise de similaridade entre grupos (F-SYS-02)
+    // Não falha o grading se der erro — é auxiliar
+    let similarityMaxJaccard = 0;
+    try {
+      const simResult = await computeSimilarityForSubmission({
+        submissionId,
+        disciplineId: submission.disciplineId,
+        targetText: result.evaluation.texto_extraido,
+      });
+      similarityMaxJaccard = simResult.maxJaccard;
+    } catch (simErr) {
+      logger.warn(
+        { submissionId, err: simErr instanceof Error ? simErr.message : String(simErr) },
+        '[similarity] falha, seguindo sem bloquear grading',
+      );
+    }
+
+    // 8. Audit log
     await db.collection('audit_log').add({
       timestamp: FieldValue.serverTimestamp(),
       actorUid: actorUid,
@@ -120,6 +138,7 @@ export async function performGrading(params: {
         durationMs: result.durationMs,
         contentKind: content.kind,
         finalScore: result.evaluation.avaliacao['nota_final'],
+        similarityMaxJaccard,
       },
       ip: null,
       userAgent: null,

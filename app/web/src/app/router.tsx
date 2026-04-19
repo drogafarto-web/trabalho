@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { DisciplinesListPage } from '@/features/disciplines/pages/DisciplinesListPage';
 import { StudentsListPage } from '@/features/students/pages/StudentsListPage';
+import { ReportsPage } from '@/features/reports/pages/ReportsPage';
 import { SubmissionFormPage } from '@/features/submission/pages/SubmissionFormPage';
 
 const router = createBrowserRouter([
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: '/dashboard',   element: <DashboardPage /> },
       { path: '/disciplinas', element: <DisciplinesListPage /> },
       { path: '/alunos',      element: <StudentsListPage /> },
+      { path: '/relatorios',  element: <ReportsPage /> },
     ],
   },
   { path: '*', element: <SubmissionFormPage /> },
