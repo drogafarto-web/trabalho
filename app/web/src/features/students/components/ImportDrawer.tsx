@@ -8,7 +8,6 @@ import {
   parseTextList,
   parseCsv,
   diffImport,
-  type ParsedRow,
   type ParseResult,
   type ImportDiff,
 } from '@/core/domain/student';
@@ -141,9 +140,14 @@ export function ImportDrawer({ open, onClose, disciplineId, disciplineName }: Pr
               <code>;</code>.
             </p>
             <div className="rounded-sm border border-dashed border-border bg-bg p-4 text-center">
+              <label htmlFor="csv-file-input" className="sr-only">
+                Enviar arquivo CSV
+              </label>
               <input
+                id="csv-file-input"
                 type="file"
                 accept=".csv,text/csv"
+                aria-label="Enviar arquivo CSV com lista de alunos"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) handleFile(f);

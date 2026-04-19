@@ -99,7 +99,7 @@ function Menu({
   onArchive,
 }: {
   onEdit: () => void;
-  onEditStudents?: () => void;
+  onEditStudents?: (() => void) | undefined;
   onArchive: () => void;
 }) {
   // Simple menu implementation — will replace with Radix UI when installed

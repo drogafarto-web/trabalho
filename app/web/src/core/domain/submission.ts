@@ -59,9 +59,57 @@ export const SubmissionInputSchema = z.object({
 });
 export type SubmissionInput = z.infer<typeof SubmissionInputSchema>;
 
+// ---------------------------------------------------------------------------
+// AI evaluation (preenchido na Fase 5)
+// ---------------------------------------------------------------------------
+export const EvaluationSchema = z.object({
+  criterionScores: z.record(z.string(), z.number()),
+  finalScore: z.number(),
+  answers: z.array(z.string()),
+  report: z.string(),
+});
+export type Evaluation = z.infer<typeof EvaluationSchema>;
+
+export const AiDataSchema = z
+  .object({
+    processedAt: z.instanceof(Timestamp).nullable().optional(),
+    model: z.string().optional(),
+    durationMs: z.number().nullable().optional(),
+    extractedText: z.string().nullable().optional(),
+    truncationNotice: z.string().nullable().optional(),
+    evaluation: EvaluationSchema.nullable().optional(),
+    error: z.string().nullable().optional(),
+  })
+  .optional();
+
+// ---------------------------------------------------------------------------
+// Review (preenchido quando professor publica ou devolve — Fase 6)
+// ---------------------------------------------------------------------------
+export const ReviewDataSchema = z
+  .object({
+    reviewedAt: z.instanceof(Timestamp).nullable().optional(),
+    reviewedByUid: z.string().nullable().optional(),
+    finalEvaluation: EvaluationSchema.nullable().optional(),
+    professorFeedback: z.string().nullable().optional(),
+    manuallyAdjusted: z.boolean().optional(),
+  })
+  .optional();
+
+// ---------------------------------------------------------------------------
+// Plagiarism (preenchido na Fase 5/7)
+// ---------------------------------------------------------------------------
+export const PlagiarismSchema = z
+  .object({
+    aiProbability: z.number().optional(),
+    similarityScore: z.number().optional(),
+    topMatches: z
+      .array(z.object({ submissionId: z.string(), jaccard: z.number() }))
+      .optional(),
+  })
+  .optional();
+
 /**
- * Documento completo como fica no Firestore após criação.
- * Alguns campos vêm do input, outros são populados server-side.
+ * Documento completo como fica no Firestore após criação + avaliação + review.
  */
 export const SubmissionSchema = z.object({
   id: z.string().min(1),
@@ -73,6 +121,9 @@ export const SubmissionSchema = z.object({
   submitter: SubmitterSchema,
   file: SubmissionFileSchema,
   status: SubmissionStatusSchema,
+  ai: AiDataSchema,
+  review: ReviewDataSchema,
+  plagiarism: PlagiarismSchema,
   submittedAt: z.instanceof(Timestamp),
   updatedAt: z.instanceof(Timestamp),
 });

@@ -6,7 +6,7 @@ import type { Criterion } from '@/core/domain/discipline';
 interface Props {
   criteria: Criterion[];
   onChange: (next: Criterion[]) => void;
-  errors?: Record<number, { name?: string; description?: string; weight?: string }>;
+  errors?: Record<number, { name?: string; description?: string; weight?: string }> | undefined;
 }
 
 export function RubricEditor({ criteria, onChange, errors }: Props) {
@@ -91,7 +91,7 @@ function CriterionRow({
 }: {
   criterion: Criterion;
   canRemove: boolean;
-  errors?: { name?: string; description?: string; weight?: string };
+  errors?: { name?: string; description?: string; weight?: string } | undefined;
   onUpdate: (patch: Partial<Criterion>) => void;
   onRemove: () => void;
 }) {

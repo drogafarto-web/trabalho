@@ -2,9 +2,9 @@ import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes } fro
 import { cn } from '@/lib/cn';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  hint?: string;
-  error?: string;
+  label?: string | undefined;
+  hint?: string | undefined;
+  error?: string | undefined;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
@@ -51,9 +51,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 });
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label?: string;
-  hint?: string;
-  error?: string;
+  label?: string | undefined;
+  hint?: string | undefined;
+  error?: string | undefined;
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
@@ -100,11 +100,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
 });
 
 interface SelectProps extends InputHTMLAttributes<HTMLSelectElement> {
-  label?: string;
-  hint?: string;
-  error?: string;
+  label?: string | undefined;
+  hint?: string | undefined;
+  error?: string | undefined;
   options: Array<{ value: string; label: string }>;
-  placeholder?: string;
+  placeholder?: string | undefined;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(

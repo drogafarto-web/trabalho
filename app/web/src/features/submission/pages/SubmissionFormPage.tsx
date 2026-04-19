@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Trash2 } from 'lucide-react';
 import { Button } from '@/shared/ui/Button';
 import { Input, Select } from '@/shared/ui/Input';
 import { Stepper } from '../components/Stepper';

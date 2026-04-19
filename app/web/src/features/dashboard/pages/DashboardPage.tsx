@@ -34,8 +34,6 @@ export function DashboardPage() {
     statusFilter || undefined,
   );
 
-  const currentDiscipline = disciplines?.find((d) => d.id === effectiveDisciplineId) ?? null;
-
   return (
     <AppShell>
       <header className="sticky top-0 z-10 border-b border-border bg-bg/80 backdrop-blur-md">

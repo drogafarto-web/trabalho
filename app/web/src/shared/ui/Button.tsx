@@ -5,11 +5,11 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
-  loading?: boolean;
-  leftIcon?: ReactNode;
-  rightIcon?: ReactNode;
+  variant?: Variant | undefined;
+  size?: Size | undefined;
+  loading?: boolean | undefined;
+  leftIcon?: ReactNode | undefined;
+  rightIcon?: ReactNode | undefined;
 }
 
 const variantClasses: Record<Variant, string> = {

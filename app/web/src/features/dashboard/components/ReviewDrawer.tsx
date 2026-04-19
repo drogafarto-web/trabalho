@@ -4,7 +4,7 @@ import { Drawer } from '@/shared/ui/Drawer';
 import { Button } from '@/shared/ui/Button';
 import { Textarea } from '@/shared/ui/Input';
 import { cn } from '@/lib/cn';
-import { StatusDot, gradeColorClass } from './StatusDot';
+import { StatusDot } from './StatusDot';
 import { PdfPreview } from './PdfPreview';
 import { RubricReviewEditor } from './RubricReviewEditor';
 import {

@@ -11,9 +11,7 @@ import {
   defaultRubric,
   suggestCode,
   type Course,
-  type Criterion,
   type Discipline,
-  type DisciplineInput,
   type Period,
   type Question,
   type Rubric,
@@ -270,7 +268,7 @@ function InfoTab({
   state: FormState;
   onChange: (patch: Partial<FormState>) => void;
   onCodeTouched: () => void;
-  errors?: Record<string, string[] | undefined>;
+  errors?: Record<string, string[] | undefined> | undefined;
 }) {
   return (
     <div className="space-y-4">

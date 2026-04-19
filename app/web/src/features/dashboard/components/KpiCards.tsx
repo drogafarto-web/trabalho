@@ -15,7 +15,7 @@ export function KpiCards({ submissions }: Props) {
   const approved = submissions.filter((s) => s.status === 'APPROVED');
   const avg =
     approved.length > 0
-      ? approved.reduce((sum, s) => sum + (s.review.finalEvaluation?.finalScore ?? 0), 0) / approved.length
+      ? approved.reduce((sum, s) => sum + (s.review?.finalEvaluation?.finalScore ?? 0), 0) / approved.length
       : null;
 
   return (
