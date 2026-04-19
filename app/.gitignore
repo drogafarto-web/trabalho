@@ -17,6 +17,7 @@ functions/lib/
 
 # Firebase
 .firebase/
+.emulator-data/
 firebase-debug.log
 firebase-debug.*.log
 .runtimeconfig.json

@@ -13,8 +13,12 @@ initializeApp();
 // Fase 1
 export { bootstrapProfessorClaim } from './admin/bootstrap-claim.js';
 
-// Fase 5: export { gradeSubmission } from './grading/grade-submission.js';
-// Fase 5: export { onSubmissionCreated } from './submissions/on-created.js';
+// Fase 5 — IA de correção
+export {
+  onSubmissionCreated,
+  gradeSubmission,
+} from './grading/grade-submission.js';
+
 // Fase 7: export { calculateSimilarity } from './similarity/calculate.js';
 
 export const healthCheck = onRequest(
