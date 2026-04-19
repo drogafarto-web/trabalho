@@ -5,10 +5,10 @@ import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { DisciplinesListPage } from '@/features/disciplines/pages/DisciplinesListPage';
 import { StudentsListPage } from '@/features/students/pages/StudentsListPage';
-import { StudentLandingPage } from '@/features/student/pages/StudentLandingPage';
+import { SubmissionFormPage } from '@/features/submission/pages/SubmissionFormPage';
 
 const router = createBrowserRouter([
-  { path: '/', element: <StudentLandingPage /> },
+  { path: '/', element: <SubmissionFormPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/nao-autorizado', element: <UnauthorizedPage /> },
   {
@@ -19,7 +19,7 @@ const router = createBrowserRouter([
       { path: '/alunos',      element: <StudentsListPage /> },
     ],
   },
-  { path: '*', element: <StudentLandingPage /> },
+  { path: '*', element: <SubmissionFormPage /> },
 ]);
 
 export function AppRouter() {

@@ -133,14 +133,35 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    //  /submissions/{id}
-    //  Liberado na Fase 4 (F-AL-01) + Fase 6 (F-PR-02/03). Deny por enquanto.
+    //  /submissions/{id} — F-AL-01 (create) + F-PR-02/03 (Fase 6)
+    //  - Aluno autenticado (anônimo ou não) pode CRIAR com status inicial.
+    //  - Validação: tem shortId, disciplineId, students válidos, file, etc.
+    //  - Leitura: apenas dono da disciplina (professor).
+    //  - Update/delete: apenas dono da disciplina (Fase 6).
     // -------------------------------------------------------------------------
     match /submissions/{id} {
-      allow read, write: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.status == 'WAITING_FOR_AI'
+        && request.resource.data.shortId is string
+        && request.resource.data.shortId.matches('^TRAB-[A-Z2-9]{4}$')
+        && request.resource.data.disciplineId is string
+        && request.resource.data.disciplineOwnerUid is string
+        && request.resource.data.students is list
+        && request.resource.data.students.size() >= 1
+        && request.resource.data.students.size() <= 3
+        && request.resource.data.file is map
+        && request.resource.data.file.sizeBytes is number
+        && request.resource.data.file.sizeBytes > 0
+        && request.resource.data.file.sizeBytes <= 47185920  // 45MB
+        && request.resource.data.submitter is map;
+
+      allow get, list: if isOwner('disciplineOwnerUid');
+
+      allow update, delete: if isOwner('disciplineOwnerUid');
 
       match /similarity_matches/{matchId} {
-        allow read, write: if false;
+        allow read: if isOwner('disciplineOwnerUid');
+        allow write: if false;
       }
     }
 

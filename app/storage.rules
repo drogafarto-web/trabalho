@@ -33,12 +33,17 @@ service firebase.storage {
     }
 
     // -------------------------------------------------------------------------
-    //  /submissions/{submissionId}/original.{ext}
-    //  Liberado na Fase 4. Deny por enquanto.
+    //  /submissions/{submissionId}/{fileName} — F-AL-01
+    //  - Upload: qualquer usuário autenticado (anônimo ou não), apenas
+    //    PDF/JPG/PNG até 45MB.
+    //  - Leitura: bloqueada do cliente. Professor acessa via Cloud Function
+    //    que gera signed URL temporária (Fase 6).
     // -------------------------------------------------------------------------
-    match /submissions/{submissionId}/{allPaths=**} {
+    match /submissions/{submissionId}/{fileName} {
+      allow write: if isSignedIn()
+        && isAllowedContentType()
+        && isValidFileSize(45);
       allow read: if false;
-      allow write: if false;
     }
 
     // -------------------------------------------------------------------------
