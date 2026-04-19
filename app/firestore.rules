@@ -92,19 +92,44 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    //  /students/{id}
-    //  Liberado na Fase 3 (F-PR-05). Por enquanto: deny all.
+    //  /students/{id} — F-PR-05
+    //  Aluno é recurso privado do professor (ownerUid).
+    //  Leitura apenas do owner autenticado como professor.
+    //  Criação/atualização/exclusão apenas do owner.
     // -------------------------------------------------------------------------
     match /students/{id} {
-      allow read, write: if false;
+      allow get, list: if isOwner('ownerUid');
+
+      allow create: if isProfessor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80;
+
+      allow update: if isOwner('ownerUid')
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isOwner('ownerUid');
     }
 
     // -------------------------------------------------------------------------
-    //  /discipline_students/{id}
-    //  Junction. Liberado na Fase 3.
+    //  /discipline_students/{compositeId} — F-PR-05
+    //  Junção disciplina <-> aluno. ID composto: {disciplineId}_{studentId}.
+    //  - Leitura pública dos campos mínimos (para aluno autocompletar no form
+    //    sem login real quando entrar Fase 4)
+    //  - Escrita apenas do owner da disciplina
     // -------------------------------------------------------------------------
     match /discipline_students/{id} {
-      allow read, write: if false;
+      allow get, list: if true;
+
+      allow create: if isProfessor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.disciplineId is string
+        && request.resource.data.studentId is string;
+
+      allow update: if isOwner('ownerUid');
+      allow delete: if isOwner('ownerUid');
     }
 
     // -------------------------------------------------------------------------
