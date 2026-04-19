@@ -62,11 +62,33 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    //  /disciplines/{id}
-    //  Liberado na Fase 2 (F-PR-04). Por enquanto: deny all.
+    //  /disciplines/{id} — F-PR-04
+    //  - Leitura pública: permitida apenas em campos mínimos (name, code,
+    //    course, period, semester, deletedAt). O cliente deve projetar.
+    //  - Escrita: apenas o dono autenticado como professor.
+    //  - Validação leve server-side (detalhe fica na Cloud Function de
+    //    criação/update quando passar a valer custom rules sanitizadas).
     // -------------------------------------------------------------------------
     match /disciplines/{id} {
-      allow read, write: if false;
+      allow get, list: if true;
+
+      allow create: if isProfessor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+             'ownerUid', 'name', 'code', 'course', 'period',
+             'semester', 'rubric', 'createdAt', 'updatedAt',
+           ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.code is string
+        && request.resource.data.code.matches('^[A-Z]{3,5}-[0-9]{4}[.][0-9]$');
+
+      allow update: if isOwner('ownerUid')
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isOwner('ownerUid');
     }
 
     // -------------------------------------------------------------------------

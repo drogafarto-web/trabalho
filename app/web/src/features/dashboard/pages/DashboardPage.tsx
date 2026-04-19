@@ -1,50 +1,41 @@
-import { useAuth } from '@/features/auth/lib/use-auth';
-import { Button } from '@/shared/ui/Button';
+import { AppShell } from '../components/AppShell';
 import { env } from '@/lib/env';
 
 /**
- * Dashboard stub — será substituído na Fase 6 (F-PR-02).
- * Por enquanto serve apenas como área protegida para validar o auth flow.
+ * Dashboard stub — lista de trabalhos real vem na Fase 6 (F-PR-02).
+ * Por enquanto mostra status do ambiente pra confirmar auth + rules.
  */
 export function DashboardPage() {
-  const { email, logout } = useAuth();
-
   return (
-    <main className="min-h-screen bg-bg">
-      <header className="border-b border-border">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-text font-display text-sm font-bold text-bg">
-              c
-            </div>
-            <span className="font-display font-semibold">
-              controle<span className="text-text-muted">.ia</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="font-mono text-xs text-text-muted">{email}</span>
-            <Button variant="ghost" size="sm" onClick={() => void logout()}>
-              Sair
-            </Button>
-          </div>
+    <AppShell>
+      <header className="sticky top-0 z-10 border-b border-border bg-bg/80 backdrop-blur-md">
+        <div className="flex h-14 items-center px-8">
+          <h1 className="font-display text-lg font-semibold tracking-tight">Trabalhos</h1>
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-6 py-16">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
-          Fase 1 concluída
-        </h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          Autenticação + rules funcionando. Próximo passo: Fase 2 — CRUD de disciplinas.
-        </p>
+      <section className="px-8 py-10">
+        <div className="rounded-lg border border-border bg-bg-surface p-8">
+          <h2 className="font-display text-md font-semibold">Fase 2 em andamento</h2>
+          <p className="mt-2 text-sm text-text-secondary">
+            A lista de trabalhos entra na Fase 6. Por enquanto, vá para{' '}
+            <a
+              href="/disciplinas"
+              className="text-primary hover:text-primary-hover"
+            >
+              Disciplinas
+            </a>{' '}
+            e crie sua primeira rubrica.
+          </p>
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <StatusCard label="Projeto" value={env.FIREBASE_PROJECT_ID} variant="primary" />
-          <StatusCard label="Modo" value={env.APP_ENV} variant="warning" />
-          <StatusCard label="Claim" value="role: professor" variant="success" />
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <StatusCard label="Projeto" value={env.FIREBASE_PROJECT_ID} variant="primary" />
+            <StatusCard label="Modo" value={env.APP_ENV} variant="warning" />
+            <StatusCard label="Claim" value="role: professor" variant="success" />
+          </div>
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -63,9 +54,9 @@ function StatusCard({
     success: 'text-success',
   };
   return (
-    <div className="rounded-lg border border-border bg-bg-surface p-4">
+    <div className="rounded-sm border border-border bg-bg p-3">
       <p className="text-xs uppercase tracking-wider text-text-muted">{label}</p>
-      <p className={`mt-1 font-mono text-sm ${colors[variant]}`}>{value}</p>
+      <p className={`mt-1 font-mono text-xs ${colors[variant]}`}>{value}</p>
     </div>
   );
 }

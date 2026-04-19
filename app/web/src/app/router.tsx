@@ -3,6 +3,7 @@ import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { UnauthorizedPage } from '@/features/auth/pages/UnauthorizedPage';
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
+import { DisciplinesListPage } from '@/features/disciplines/pages/DisciplinesListPage';
 import { StudentLandingPage } from '@/features/student/pages/StudentLandingPage';
 
 const router = createBrowserRouter([
@@ -12,7 +13,8 @@ const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
-      { path: '/dashboard', element: <DashboardPage /> },
+      { path: '/dashboard',   element: <DashboardPage /> },
+      { path: '/disciplinas', element: <DisciplinesListPage /> },
     ],
   },
   { path: '*', element: <StudentLandingPage /> },

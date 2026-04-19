@@ -103,14 +103,14 @@ purpose: Stack técnica definitiva com justificativas. Se algo não está aqui, 
 ### Modelos
 | Caso de uso | Modelo | Por quê |
 |---|---|---|
-| Correção de trabalho | `gemini-2.5-flash` | Suficiente, rápido, barato |
-| OCR visual (manuscrito) | `gemini-2.5-flash` com vision | Nativo multimodal |
+| Correção de trabalho | `gemini-3.1-flash` | Suficiente, rápido, barato |
+| OCR visual (manuscrito) | `gemini-3.1-flash` com vision | Nativo multimodal |
 | Detecção de similaridade | (não é IA — Jaccard manual) | Determinístico, gratuito |
 
 ### Configuração obrigatória
 ```ts
 {
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3.1-flash',
   config: {
     temperature: 0.1,
     responseMimeType: 'application/json',

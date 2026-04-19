@@ -29,7 +29,9 @@ Item de avaliação da rubrica. Tem `name`, `description`, `weight`.
 Ex: `identificacao_clinica`, `ciclo_biologico`.
 
 ### Disciplina (`discipline`)
-Matéria/curso com rubrica própria. Ex: "Parasitologia Clínica 2026.1".
+Matéria/curso com rubrica própria. Ex: "PARASITOLOGIA CLÍNICA 2026.1".
+**Convenção:** nome sempre em **MAIÚSCULAS** (estilo diário escolar).
+O schema aplica `toUpperCase()` no parse. Ver `DisciplineInputSchema`.
 **Não confundir** com `course` (Farmácia, Biomedicina).
 
 ### Grupo (`group`)
