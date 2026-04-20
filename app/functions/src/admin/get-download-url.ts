@@ -21,7 +21,12 @@ const EXPIRES_IN_MS = 5 * 60 * 1000;
 export const getSubmissionDownloadUrl = onCall(
   {
     region: 'southamerica-east1',
-    cors: true,
+    cors: [
+      /trabalhos-e0647\.web\.app$/,
+      /trabalhos-e0647\.firebaseapp\.com$/,
+      /localhost:\d+$/,
+      /127\.0\.0\.1:\d+$/,
+    ],
     timeoutSeconds: 10,
   },
   async (request) => {

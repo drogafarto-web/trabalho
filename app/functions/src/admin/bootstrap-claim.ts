@@ -17,7 +17,15 @@ import { logger } from '../lib/logger.js';
  * Cada chamada é registrada em audit_log (imutável).
  */
 export const bootstrapProfessorClaim = onCall(
-  { region: 'southamerica-east1' },
+  {
+    region: 'southamerica-east1',
+    cors: [
+      /trabalhos-e0647\.web\.app$/,
+      /trabalhos-e0647\.firebaseapp\.com$/,
+      /localhost:\d+$/,
+      /127\.0\.0\.1:\d+$/,
+    ],
+  },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Requer autenticação.');
