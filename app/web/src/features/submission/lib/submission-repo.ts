@@ -16,6 +16,7 @@ import {
   sanitizeFileName,
   type SubmissionInput,
   type SubmissionStudentRef,
+  type SubmittedUrl,
   type Submitter,
 } from '@/core/domain/submission';
 
@@ -30,65 +31,86 @@ export interface UploadProgress {
   totalBytes: number;
 }
 
+export type SubmissionPayload =
+  | { kind: 'file'; file: File }
+  | { kind: 'url'; submittedUrl: SubmittedUrl };
+
 /**
- * Orquestra: (1) gera ID, (2) upload com progresso, (3) cria doc.
- * Se o upload falha, nenhum doc é criado (não polui o Firestore).
- * Se o create falha depois do upload, o arquivo fica no Storage
- * — GC manual via Cloud Function na Fase 5 (detecta órfãos > 1h).
+ * Orquestra a criação da submissão. Dois caminhos:
+ *  - File: upload pro Storage, doc aponta pro storagePath.
+ *  - URL: sem upload; doc guarda `submittedUrl` + `file: null`.
+ *
+ * Se o upload falha, nenhum doc é criado. Se o create falha depois do
+ * upload, o arquivo fica órfão no Storage — GC manual fica pra Fase 5.
  */
 export async function submitAssignment(params: {
   input: SubmissionInput;
   disciplineOwnerUid: string;
   rubricVersion: number;
-  file: File;
+  payload: SubmissionPayload;
   onProgress?: (p: UploadProgress) => void;
 }): Promise<CreatedSubmission> {
-  const { input, disciplineOwnerUid, rubricVersion, file, onProgress } = params;
+  const { input, disciplineOwnerUid, rubricVersion, payload, onProgress } = params;
 
-  // 1. Gera IDs
   const submissionRef = doc(collection(db, 'submissions'));
   const shortId = generateShortId();
 
-  // 2. Upload
-  const ext = fileExtension(file.name) || 'bin';
-  const cleanName = sanitizeFileName(file.name);
-  const storagePath = `submissions/${submissionRef.id}/original_${cleanName}.${ext}`;
-  const uploadRef = storageRef(storage, storagePath);
+  let fileField: {
+    storagePath: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  } | null = null;
+  let urlField: SubmittedUrl | null = null;
 
-  await new Promise<void>((resolve, reject) => {
-    const task = uploadBytesResumable(uploadRef, file, {
-      contentType: file.type,
+  if (payload.kind === 'file') {
+    const file = payload.file;
+    const ext = fileExtension(file.name) || 'bin';
+    const cleanName = sanitizeFileName(file.name);
+    const storagePath = `submissions/${submissionRef.id}/original_${cleanName}.${ext}`;
+    const uploadRef = storageRef(storage, storagePath);
+
+    await new Promise<void>((resolve, reject) => {
+      const task = uploadBytesResumable(uploadRef, file, {
+        contentType: file.type,
+      });
+
+      task.on(
+        'state_changed',
+        (snap: UploadTaskSnapshot) => {
+          onProgress?.({
+            percent: Math.round((snap.bytesTransferred / snap.totalBytes) * 100),
+            bytesTransferred: snap.bytesTransferred,
+            totalBytes: snap.totalBytes,
+          });
+        },
+        (err) => reject(err),
+        () => resolve(),
+      );
     });
 
-    task.on(
-      'state_changed',
-      (snap: UploadTaskSnapshot) => {
-        onProgress?.({
-          percent: Math.round((snap.bytesTransferred / snap.totalBytes) * 100),
-          bytesTransferred: snap.bytesTransferred,
-          totalBytes: snap.totalBytes,
-        });
-      },
-      (err) => reject(err),
-      () => resolve(),
-    );
-  });
+    fileField = {
+      storagePath,
+      fileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+    };
+  } else {
+    urlField = payload.submittedUrl;
+    onProgress?.({ percent: 100, bytesTransferred: 0, totalBytes: 0 });
+  }
 
-  // 3. Create doc (batch garante atomicidade em relação a possíveis junções futuras)
   const batch = writeBatch(db);
   batch.set(submissionRef, {
     shortId,
     disciplineId: input.disciplineId,
     disciplineOwnerUid,
+    assignmentId: input.assignmentId,
     rubricVersion,
     students: input.students satisfies SubmissionStudentRef[],
     submitter: input.submitter satisfies Submitter,
-    file: {
-      storagePath,
-      fileName: file.name,
-      mimeType: file.type,
-      sizeBytes: file.size,
-    },
+    file: fileField,
+    submittedUrl: urlField,
     status: 'WAITING_FOR_AI',
     submittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

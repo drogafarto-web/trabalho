@@ -88,12 +88,24 @@ export class GeminiProvider implements AIProvider {
       if (content.truncated) {
         truncationNotice = `Texto truncado em 50k chars (${String(content.pageCount)} págs).`;
       }
-    } else {
+    } else if (content.kind === 'binary') {
       parts.push({
         text: 'Trabalho do aluno no anexo (pode ser manuscrito/escaneado). Faça OCR completo.',
       });
       parts.push({
         inlineData: { data: content.base64, mimeType: content.mimeType },
+      });
+      parts.push({ text: 'Retorne APENAS JSON no schema fornecido.' });
+    } else {
+      // kind === 'url' — hoje só YouTube. Gemini ingesta nativamente via fileData.
+      parts.push({
+        text:
+          'Trabalho do aluno é um vídeo do YouTube. Assista ao conteúdo completo, ' +
+          'transcreva a fala quando relevante e avalie o conteúdo técnico apresentado. ' +
+          'Em texto_extraido, inclua um resumo estruturado do que foi abordado.',
+      });
+      parts.push({
+        fileData: { fileUri: content.url, mimeType: 'video/*' },
       });
       parts.push({ text: 'Retorne APENAS JSON no schema fornecido.' });
     }

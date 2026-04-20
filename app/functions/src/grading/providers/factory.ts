@@ -46,3 +46,24 @@ export function buildProvider(name?: ProviderName): AIProvider {
       );
   }
 }
+
+/**
+ * Variante que aceita override explícito (vindo do Firestore /config/llm)
+ * para que a UI /config consiga trocar provider/chave sem redeploy.
+ */
+export function buildProviderFromConfig(cfg: {
+  provider: ProviderName;
+  apiKey: string;
+  model: string | null;
+}): AIProvider {
+  const model = cfg.model ?? undefined;
+  switch (cfg.provider) {
+    case 'anthropic':
+      return new AnthropicProvider(cfg.apiKey, model);
+    case 'qwen':
+      return new QwenProvider(cfg.apiKey, model);
+    case 'gemini':
+    default:
+      return new GeminiProvider(cfg.apiKey, model);
+  }
+}

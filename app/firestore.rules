@@ -133,6 +133,73 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
+    //  /terms/{id} — Etapas letivas (1ª/2ª/3ª) por DISCIPLINA
+    //  Escopadas por disciplina (professor pode lecionar em instituições com
+    //  calendários distintos). Leitura pública: Fase 3 agrupa atividades no form
+    //  do aluno por etapa; rótulo/ano/número não são sensíveis.
+    // -------------------------------------------------------------------------
+    match /terms/{id} {
+      allow get, list: if true;
+
+      allow create: if isProfessor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.disciplineId is string
+        && request.resource.data.year is int
+        && request.resource.data.year >= 2020
+        && request.resource.data.number is int
+        && request.resource.data.number >= 1
+        && request.resource.data.number <= 8
+        && request.resource.data.label is string;
+
+      allow update: if isOwner('ownerUid')
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.disciplineId == resource.data.disciplineId
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isOwner('ownerUid');
+    }
+
+    // -------------------------------------------------------------------------
+    //  /assignments/{id} — Atividades (Trabalho/AECO) por disciplina+etapa
+    //  - Leitura PÚBLICA dos campos mínimos (aluno precisa ver pra escolher
+    //    no form de submissão sem login real)
+    //  - Escrita apenas pro dono da disciplina (ownerUid)
+    // -------------------------------------------------------------------------
+    match /assignments/{id} {
+      allow get, list: if true;
+
+      allow create: if isProfessor()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.disciplineId is string
+        && request.resource.data.termId is string
+        && request.resource.data.kind in ['trabalho', 'aeco']
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 2
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.maxScore is number
+        && request.resource.data.mode in ['individual', 'group']
+        && request.resource.data.status in ['draft', 'open', 'closed'];
+
+      allow update: if isOwner('ownerUid')
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.disciplineId == resource.data.disciplineId
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if isOwner('ownerUid');
+    }
+
+    // -------------------------------------------------------------------------
+    //  /assignment_locks/{id} — Anti-duplicata em grupo
+    //  ID composto: {assignmentId}_{studentId}.
+    //  Escrita: SOMENTE Cloud Function (trigger pós-criação de submission).
+    //  Leitura: dono da disciplina (pra debug/auditoria).
+    // -------------------------------------------------------------------------
+    match /assignment_locks/{id} {
+      allow get, list: if isOwner('ownerUid');
+      allow create, update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
     //  /submissions/{id} — F-AL-01 (create) + F-PR-02/03 (Fase 6)
     //  - Aluno autenticado (anônimo ou não) pode CRIAR com status inicial.
     //  - Validação: tem shortId, disciplineId, students válidos, file, etc.
@@ -146,14 +213,28 @@ service cloud.firestore {
         && request.resource.data.shortId.matches('^TRAB-[A-Z2-9]{4}$')
         && request.resource.data.disciplineId is string
         && request.resource.data.disciplineOwnerUid is string
+        && request.resource.data.assignmentId is string
         && request.resource.data.students is list
         && request.resource.data.students.size() >= 1
         && request.resource.data.students.size() <= 3
-        && request.resource.data.file is map
-        && request.resource.data.file.sizeBytes is number
-        && request.resource.data.file.sizeBytes > 0
-        && request.resource.data.file.sizeBytes <= 47185920  // 45MB
-        && request.resource.data.submitter is map;
+        && request.resource.data.submitter is map
+        && (
+          // Entrega por arquivo (Storage)
+          (
+            request.resource.data.file is map
+            && request.resource.data.file.sizeBytes is number
+            && request.resource.data.file.sizeBytes > 0
+            && request.resource.data.file.sizeBytes <= 47185920  // 45MB
+          )
+          // Entrega por URL (YouTube etc)
+          || (
+            request.resource.data.submittedUrl is map
+            && request.resource.data.submittedUrl.url is string
+            && request.resource.data.submittedUrl.url.size() > 0
+            && request.resource.data.submittedUrl.url.size() <= 500
+            && request.resource.data.submittedUrl.kind in ['youtube']
+          )
+        );
 
       allow get, list: if isOwner('disciplineOwnerUid');
 
@@ -163,6 +244,17 @@ service cloud.firestore {
         allow read: if isOwner('disciplineOwnerUid');
         allow write: if false;
       }
+    }
+
+    // -------------------------------------------------------------------------
+    //  /config/{doc} — Fase 9 (UI /config)
+    //  Configuração de runtime (LLM provider/model/apiKey).
+    //  Único professor da v2 lê e escreve; quando virar multi-tenant a chave
+    //  migra pra Secret Manager por tenant via callable.
+    // -------------------------------------------------------------------------
+    match /config/{doc} {
+      allow read: if isProfessor();
+      allow write: if isProfessor();
     }
 
     // -------------------------------------------------------------------------
@@ -181,6 +273,27 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
     match /stats/{id} {
       allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  /mail_events/{id}
+    //  Trilha de eventos do Resend (sent, delivered, bounced, complained).
+    //  Escrita exclusivamente via Admin SDK (trigger de envio + webhook).
+    //  Leitura apenas professor — debug/auditoria.
+    // -------------------------------------------------------------------------
+    match /mail_events/{id} {
+      allow get, list: if isProfessor();
+      allow create, update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    //  /mail_suppressions/{emailKey}
+    //  Emails bloqueados (hard bounce ou complaint). Ver email/webhook.ts.
+    //  Leitura: professor (debug). Escrita: só Admin SDK.
+    // -------------------------------------------------------------------------
+    match /mail_suppressions/{id} {
+      allow get, list: if isProfessor();
+      allow create, update, delete: if false;
     }
 
     // -------------------------------------------------------------------------

@@ -15,7 +15,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run type-check && npm run test"
+    "check": "npm run lint && npm run type-check && npm run test",
+    "generate:templates": "node scripts/generate-templates.mjs",
+    "generate:fixtures": "node scripts/generate-fixtures.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -31,6 +33,7 @@
     "react-pdf": "^9.2.1",
     "react-router-dom": "^6.27.0",
     "tailwind-merge": "^2.5.4",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8",
     "zustand": "^5.0.0"
   },
@@ -50,6 +53,7 @@
     "eslint": "^9.12.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.12",
+    "exceljs": "^4.4.0",
     "jsdom": "^25.0.0",
     "postcss": "^8.4.47",
     "prettier": "^3.3.3",

@@ -59,6 +59,13 @@ export class AnthropicProvider implements AIProvider {
     // SDK tipo exato varia entre versões — usa unknown[] pra flexibilidade
     const blocks: Array<Record<string, unknown>> = [];
 
+    if (content.kind === 'url') {
+      throw new ProviderError(
+        'UNSUPPORTED_CONTENT',
+        'Entregas por URL (ex: YouTube) são suportadas apenas pelo provider Gemini. Troque o provider em /config.',
+      );
+    }
+
     if (content.kind === 'text') {
       blocks.push({ type: 'text', text: wrapStudentTextContent(content.text) });
       if (content.truncated) {

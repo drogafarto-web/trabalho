@@ -140,16 +140,29 @@ export function ReviewDrawer({ open, submission, onClose }: Props) {
           </div>
         )}
 
-        {/* Arquivo original */}
+        {/* Entrega (arquivo ou URL) */}
         <section>
           <h3 className="mb-2 text-[10px] font-medium uppercase tracking-wider text-text-muted">
-            Arquivo entregue
+            {sub.file ? 'Arquivo entregue' : 'Link entregue'}
           </h3>
-          <PdfPreview
-            submissionId={sub.id}
-            mimeType={sub.file.mimeType}
-            fileName={sub.file.fileName}
-          />
+          {sub.file ? (
+            <PdfPreview
+              submissionId={sub.id}
+              mimeType={sub.file.mimeType}
+              fileName={sub.file.fileName}
+            />
+          ) : sub.submittedUrl ? (
+            <a
+              href={sub.submittedUrl.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-sm border border-border bg-bg-surface px-3 py-2 font-mono text-xs text-primary hover:border-primary/50 hover:text-primary-hover"
+            >
+              {sub.submittedUrl.url}
+            </a>
+          ) : (
+            <p className="text-xs text-text-muted">Sem entrega anexada.</p>
+          )}
         </section>
 
         {/* Texto OCR (toggleable) */}

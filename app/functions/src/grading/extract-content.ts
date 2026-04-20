@@ -26,10 +26,25 @@ export interface ExtractedBinary {
   sizeBytes: number;
 }
 
-export type ExtractedContent = ExtractedText | ExtractedBinary;
+/**
+ * Entrega por URL — hoje só YouTube. Providers decidem como interpretar:
+ * Gemini usa `fileData.fileUri` (suporte nativo a vídeo); Anthropic/Qwen
+ * rejeitam com erro amigável.
+ */
+export interface ExtractedUrl {
+  kind: 'url';
+  url: string;
+  urlKind: 'youtube';
+}
+
+export type ExtractedContent = ExtractedText | ExtractedBinary | ExtractedUrl;
 
 const MAX_TEXT_CHARS = 50_000;
 const MIN_TEXT_THRESHOLD = 100; // se menos que isso, é provável PDF escaneado
+
+const MIME_DOCX =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const MIME_DOC = 'application/msword';
 
 // ---------------------------------------------------------------------------
 // Baixa arquivo do Storage
@@ -66,14 +81,29 @@ async function extractPdfText(
 }
 
 // ---------------------------------------------------------------------------
-// Extrai conteúdo do arquivo armazenado em Storage
+// Extrai texto de .docx via mammoth (pure JS, sem Word/LibreOffice).
+// .doc (formato antigo binário) NÃO é suportado — mammoth só lê openxml.
 // ---------------------------------------------------------------------------
-export async function extractContent(params: {
-  storagePath: string;
-  mimeType: string;
-}): Promise<ExtractedContent> {
-  const { storagePath, mimeType } = params;
+async function extractDocxText(buffer: Buffer): Promise<string> {
+  const mammoth = (await import('mammoth')).default;
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value ?? '';
+}
 
+// ---------------------------------------------------------------------------
+// Extração unificada — arquivo do Storage OU URL submetida
+// ---------------------------------------------------------------------------
+export type ExtractSource =
+  | { kind: 'file'; storagePath: string; mimeType: string }
+  | { kind: 'url'; url: string; urlKind: 'youtube' };
+
+export async function extractContent(source: ExtractSource): Promise<ExtractedContent> {
+  if (source.kind === 'url') {
+    logger.info({ url: source.url, urlKind: source.urlKind }, '[extract] url recebida');
+    return { kind: 'url', url: source.url, urlKind: source.urlKind };
+  }
+
+  const { storagePath, mimeType } = source;
   logger.info({ storagePath, mimeType }, '[extract] iniciando download');
   const buffer = await downloadFromStorage(storagePath);
 
@@ -90,7 +120,57 @@ export async function extractContent(params: {
   }
 
   // -----------------------------------------------------------------------
-  // Caso 2: PDF → tenta extrair texto
+  // Caso 2: DOCX → mammoth extrai texto puro. Se falhar, vai pra binary
+  // (Gemini costuma não processar docx — mas evita crash).
+  // -----------------------------------------------------------------------
+  if (mimeType === MIME_DOCX) {
+    try {
+      const text = (await extractDocxText(buffer)).trim();
+      if (text.length >= MIN_TEXT_THRESHOLD) {
+        const truncated = text.length > MAX_TEXT_CHARS;
+        logger.info(
+          { storagePath, charCount: text.length },
+          '[extract] docx text extraído',
+        );
+        return {
+          kind: 'text',
+          text: truncated ? text.slice(0, MAX_TEXT_CHARS) : text,
+          pageCount: 0, // docx não reporta páginas sem renderizar
+          truncated,
+        };
+      }
+      logger.warn(
+        { storagePath, charCount: text.length },
+        '[extract] docx com pouco texto, fallback binary',
+      );
+    } catch (err) {
+      logger.warn({ err, storagePath }, '[extract] falha em mammoth, fallback binary');
+    }
+
+    return {
+      kind: 'binary',
+      base64: buffer.toString('base64'),
+      mimeType,
+      sizeBytes: buffer.byteLength,
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // Caso 2b: .doc antigo — mammoth não lê. Loga e rejeita com mime claro.
+  // O form deveria ter barrado antes; chegar aqui é defensivo.
+  // -----------------------------------------------------------------------
+  if (mimeType === MIME_DOC) {
+    logger.warn(
+      { storagePath },
+      '[extract] .doc legado não é suportado (use .docx)',
+    );
+    throw new Error(
+      'Formato .doc (Word 97-2003) não suportado. Peça ao aluno para salvar como .docx ou PDF.',
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Caso 3: PDF → tenta extrair texto
   // -----------------------------------------------------------------------
   if (mimeType === 'application/pdf') {
     try {

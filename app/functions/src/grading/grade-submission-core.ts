@@ -1,8 +1,9 @@
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logger } from '../lib/logger.js';
 import { extractContent } from './extract-content.js';
-import { buildProvider } from './providers/factory.js';
+import { buildProvider, buildProviderFromConfig } from './providers/factory.js';
 import { ProviderError } from './providers/types.js';
+import { readLlmConfig } from '../admin/llm-config-store.js';
 import { computeSimilarityForSubmission } from '../similarity/compute-similarity.js';
 
 /**
@@ -27,8 +28,12 @@ export async function performGrading(params: {
   const submissionRef = db.collection('submissions').doc(submissionId);
   const startedAt = Date.now();
 
-  // 1. Constrói o provider ativo (Gemini, Anthropic ou Qwen)
-  const provider = buildProvider();
+  // 1. Constrói o provider ativo (Gemini, Anthropic ou Qwen).
+  //    Prioridade: config gravado pela UI /config > env var (Secret Manager).
+  const runtimeCfg = await readLlmConfig();
+  const provider = runtimeCfg
+    ? buildProviderFromConfig(runtimeCfg)
+    : buildProvider();
 
   if (!provider.isConfigured()) {
     logger.warn(
@@ -63,9 +68,32 @@ export async function performGrading(params: {
     }
     const submission = snap.data() as {
       disciplineId: string;
+      assignmentId?: string;
       rubricVersion: number;
-      file: { storagePath: string; mimeType: string };
+      file: { storagePath: string; mimeType: string } | null;
+      submittedUrl?: { url: string; kind: 'youtube' } | null;
     };
+
+    // Snapshot do maxScore pra escalamento. Submissões legadas sem
+    // assignmentId → fallback 10 (nota fica igual à nota-rubrica).
+    let maxScore = 10;
+    if (submission.assignmentId) {
+      const assignmentSnap = await db
+        .collection('assignments')
+        .doc(submission.assignmentId)
+        .get();
+      if (assignmentSnap.exists) {
+        const data = assignmentSnap.data() as { maxScore?: number };
+        if (typeof data.maxScore === 'number' && data.maxScore > 0) {
+          maxScore = data.maxScore;
+        }
+      } else {
+        logger.warn(
+          { submissionId, assignmentId: submission.assignmentId },
+          '[grading] assignment não encontrado — escalamento usa fallback 10',
+        );
+      }
+    }
 
     // 4. Lê disciplina (com rubrica snapshot)
     const disciplineSnap = await db
@@ -85,11 +113,24 @@ export async function performGrading(params: {
       };
     };
 
-    // 5. Extrai conteúdo do arquivo
-    const content = await extractContent({
-      storagePath: submission.file.storagePath,
-      mimeType: submission.file.mimeType,
-    });
+    // 5. Extrai conteúdo (arquivo ou URL)
+    if (!submission.file && !submission.submittedUrl) {
+      throw new ProviderError(
+        'UNSUPPORTED_CONTENT',
+        'Submissão sem arquivo ou URL — dado inconsistente.',
+      );
+    }
+    const content = submission.file
+      ? await extractContent({
+          kind: 'file',
+          storagePath: submission.file.storagePath,
+          mimeType: submission.file.mimeType,
+        })
+      : await extractContent({
+          kind: 'url',
+          url: submission.submittedUrl!.url,
+          urlKind: submission.submittedUrl!.kind,
+        });
 
     // 6. Chama o provider ativo
     const result = await provider.grade({
@@ -102,6 +143,8 @@ export async function performGrading(params: {
     });
 
     // 6. Grava avaliação + muda status
+    const rubricScore = roundScore(result.evaluation.avaliacao['nota_final'] ?? 0);
+    const scaledScore = roundScore((rubricScore * maxScore) / 10);
     await submissionRef.update({
       status: 'PENDING_REVIEW',
       ai: {
@@ -115,7 +158,9 @@ export async function performGrading(params: {
             result.evaluation.avaliacao,
             discipline.rubric.criteria.map((c) => c.name),
           ),
-          finalScore: roundScore(result.evaluation.avaliacao['nota_final'] ?? 0),
+          finalScore: rubricScore,
+          scaledScore,
+          maxScore,
           answers: result.evaluation.respostas,
           report: result.evaluation.relatorio,
         },
@@ -169,7 +214,9 @@ export async function performGrading(params: {
       {
         submissionId,
         durationMs: Date.now() - startedAt,
-        finalScore: result.evaluation.avaliacao['nota_final'],
+        rubricScore,
+        scaledScore,
+        maxScore,
       },
       '[grading] success',
     );
@@ -177,7 +224,7 @@ export async function performGrading(params: {
     return {
       ok: true,
       durationMs: Date.now() - startedAt,
-      finalScore: result.evaluation.avaliacao['nota_final'],
+      finalScore: rubricScore,
     };
   } catch (err) {
     const errorCode = err instanceof ProviderError ? err.code : 'UNKNOWN';

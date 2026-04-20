@@ -2,9 +2,12 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { defineSecret } from 'firebase-functions/params';
 import { z } from 'zod';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logger } from '../lib/logger.js';
 import { performGrading } from './grade-submission-core.js';
+import { acquireAssignmentLocks } from '../submissions/acquire-assignment-locks.js';
+import { sendSubmissionReceipt } from '../email/send-submission-receipt.js';
+import { RESEND_API_KEY } from '../email/resend-client.js';
 
 /**
  * Todos os secrets são opcionais — o deploy não bloqueia se nenhum
@@ -28,7 +31,7 @@ import { performGrading } from './grade-submission-core.js';
  */
 const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
-const ALL_SECRETS = [GEMINI_API_KEY];
+const ALL_SECRETS = [GEMINI_API_KEY, RESEND_API_KEY];
 
 const REGION = 'southamerica-east1';
 
@@ -55,6 +58,83 @@ export const onSubmissionCreated = onDocumentCreated(
         '[trigger] submissão não está em WAITING_FOR_AI, ignorando',
       );
       return;
+    }
+
+    // Anti-duplicata em grupo: adquire locks antes de gradear.
+    // Docs legados sem assignmentId (smoke tests pré-Fase 3) pulam locks.
+    const assignmentId = typeof data?.['assignmentId'] === 'string'
+      ? (data['assignmentId'] as string)
+      : null;
+    const rawStudents = Array.isArray(data?.['students']) ? data['students'] : [];
+    const students = rawStudents
+      .map((s: unknown) => {
+        if (!s || typeof s !== 'object') return null;
+        const obj = s as { id?: unknown; name?: unknown };
+        if (typeof obj.id !== 'string' || typeof obj.name !== 'string') return null;
+        return { id: obj.id, name: obj.name };
+      })
+      .filter((x): x is { id: string; name: string } => x !== null);
+    const ownerUid = typeof data?.['disciplineOwnerUid'] === 'string'
+      ? (data['disciplineOwnerUid'] as string)
+      : null;
+    const disciplineId = typeof data?.['disciplineId'] === 'string'
+      ? (data['disciplineId'] as string)
+      : null;
+
+    if (assignmentId && ownerUid && disciplineId && students.length > 0) {
+      const lockResult = await acquireAssignmentLocks({
+        submissionId,
+        assignmentId,
+        ownerUid,
+        disciplineId,
+        students,
+      });
+
+      if (!lockResult.ok) {
+        const db = getFirestore();
+        const reason = lockResult.conflictStudentName
+          ? `${lockResult.conflictStudentName} já entregou esta atividade em outra submissão.`
+          : 'Aluno já entregou esta atividade em outra submissão.';
+        logger.warn(
+          {
+            submissionId,
+            assignmentId,
+            conflictSubmissionId: lockResult.conflictSubmissionId,
+          },
+          '[trigger] conflito de lock — rejeitando submissão',
+        );
+        await db.collection('submissions').doc(submissionId).update({
+          status: 'REJECTED',
+          review: {
+            reviewedAt: Timestamp.now(),
+            reviewedByUid: null,
+            finalEvaluation: null,
+            professorFeedback: reason,
+            manuallyAdjusted: false,
+          },
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+    } else {
+      logger.warn(
+        { submissionId, hasAssignmentId: !!assignmentId },
+        '[trigger] dados incompletos pra lock — pulando, prosseguindo com grading',
+      );
+    }
+
+    // Envia recibo ao aluno — não-bloqueante. Falha aqui não interrompe grading.
+    // Idempotência via `receipt_{submissionId}` no Resend evita duplicatas em retry.
+    try {
+      await sendSubmissionReceipt({ submissionId });
+    } catch (receiptErr) {
+      logger.warn(
+        {
+          submissionId,
+          err: receiptErr instanceof Error ? receiptErr.message : String(receiptErr),
+        },
+        '[trigger] falha no envio do recibo — grading segue',
+      );
     }
 
     logger.info({ submissionId }, '[trigger] iniciando grading automático');

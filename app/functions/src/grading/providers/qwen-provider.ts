@@ -66,6 +66,13 @@ export class QwenProvider implements AIProvider {
     let truncationNotice: string | null = null;
     const userContent: OpenAI.ChatCompletionContentPart[] = [];
 
+    if (content.kind === 'url') {
+      throw new ProviderError(
+        'UNSUPPORTED_CONTENT',
+        'Entregas por URL (ex: YouTube) são suportadas apenas pelo provider Gemini. Troque o provider em /config.',
+      );
+    }
+
     if (content.kind === 'text') {
       userContent.push({
         type: 'text',

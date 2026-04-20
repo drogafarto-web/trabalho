@@ -24,6 +24,9 @@ export { getSubmissionDownloadUrl } from './admin/get-download-url.js';
 
 // Fase 7: export { calculateSimilarity } from './similarity/calculate.js';
 
+// Email transacional — webhook Resend (bounce/complaint/delivered)
+export { resendWebhook } from './email/webhook.js';
+
 export const healthCheck = onRequest(
   { region: 'southamerica-east1' },
   (_req, res) => {

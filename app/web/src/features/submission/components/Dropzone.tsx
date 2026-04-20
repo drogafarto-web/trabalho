@@ -4,7 +4,8 @@ import { cn } from '@/lib/cn';
 import {
   MAX_FILE_SIZE_MB,
   ACCEPTED_MIME_TYPES,
-  isAcceptedMime,
+  ACCEPTED_FORMATS_LABEL,
+  isAcceptedFile,
   MAX_FILE_SIZE_BYTES,
 } from '@/core/domain/submission';
 
@@ -22,8 +23,8 @@ export function Dropzone({ file, onChange, progress = 0, state = 'idle', error }
   const [localError, setLocalError] = useState<string | null>(null);
 
   const validate = useCallback((f: File): string | null => {
-    if (!isAcceptedMime(f.type)) {
-      return 'Formato não aceito. Use PDF, JPG ou PNG.';
+    if (!isAcceptedFile(f)) {
+      return `Formato não aceito. Use ${ACCEPTED_FORMATS_LABEL}.`;
     }
     if (f.size > MAX_FILE_SIZE_BYTES) {
       return `Arquivo maior que ${String(MAX_FILE_SIZE_MB)}MB.`;
@@ -168,14 +169,14 @@ export function Dropzone({ file, onChange, progress = 0, state = 'idle', error }
           {dragging ? 'Solte o arquivo aqui' : 'Arraste ou clique para enviar'}
         </p>
         <p className="mt-1 text-[11px] text-text-muted">
-          PDF, JPG ou PNG · até {MAX_FILE_SIZE_MB}MB
+          {ACCEPTED_FORMATS_LABEL} · até {MAX_FILE_SIZE_MB}MB
         </p>
       </div>
 
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPTED_MIME_TYPES.join(',')}
+        accept={[...ACCEPTED_MIME_TYPES, '.pdf', '.docx', '.jpg', '.jpeg', '.png'].join(',')}
         onChange={(e) => handleFiles(e.target.files)}
         className="sr-only"
       />

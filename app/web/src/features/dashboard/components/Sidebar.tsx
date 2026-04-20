@@ -8,6 +8,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  FileUp,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -16,6 +17,7 @@ const NAV = [
   { to: '/disciplinas', label: 'Disciplinas', icon: BookOpen },
   { to: '/alunos',      label: 'Alunos',      icon: Users },
   { to: '/relatorios',  label: 'Relatórios',  icon: BarChart3 },
+  { to: '/importar',    label: 'Importar',    icon: FileUp },
   { to: '/config',      label: 'Configurações', icon: Settings },
 ] as const;
 

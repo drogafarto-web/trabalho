@@ -1,4 +1,5 @@
-import { MoreHorizontal, Archive, Edit3, Users, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MoreHorizontal, Archive, Edit3, Users, FileText, ListChecks } from 'lucide-react';
 import type { Discipline } from '@/core/domain/discipline';
 
 interface Props {
@@ -16,9 +17,12 @@ export function DisciplineCard({ discipline, onEdit, onArchive, onEditStudents }
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1 pr-3">
-          <h3 className="truncate font-display text-md font-semibold tracking-tight">
+          <Link
+            to={`/disciplinas/${d.id}`}
+            className="block truncate font-display text-md font-semibold tracking-tight hover:underline"
+          >
             {d.name}
-          </h3>
+          </Link>
           <p className="mt-0.5 font-mono text-xs text-text-muted">{d.code}</p>
         </div>
         <Menu
@@ -44,6 +48,13 @@ export function DisciplineCard({ discipline, onEdit, onArchive, onEditStudents }
 
       {/* Actions */}
       <div className="mt-4 flex gap-2">
+        <Link
+          to={`/disciplinas/${d.id}`}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-sm border border-primary/40 bg-primary/10 py-1.5 text-xs text-text transition-colors hover:bg-primary/20"
+        >
+          <ListChecks className="h-3.5 w-3.5" />
+          Atividades
+        </Link>
         <button
           type="button"
           onClick={() => onEdit(d)}
@@ -57,7 +68,7 @@ export function DisciplineCard({ discipline, onEdit, onArchive, onEditStudents }
             onClick={() => onEditStudents(d)}
             className="flex-1 rounded-sm border border-border bg-bg py-1.5 text-xs text-text-secondary transition-colors hover:border-border-strong hover:text-text"
           >
-            Editar alunos
+            Alunos
           </button>
         )}
       </div>

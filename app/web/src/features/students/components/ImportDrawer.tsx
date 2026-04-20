@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { AlertCircle, FileText, Upload } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Download, FileSpreadsheet, FileText, Upload } from 'lucide-react';
 import { Drawer } from '@/shared/ui/Drawer';
 import { Textarea } from '@/shared/ui/Input';
 import { Button } from '@/shared/ui/Button';
@@ -12,6 +12,7 @@ import {
   type ImportDiff,
 } from '@/core/domain/student';
 import { useMyStudents, useBulkImportStudents } from '../lib/use-students';
+import { parseXlsxStudentsFile } from '../lib/parse-xlsx-students';
 
 interface Props {
   open: boolean;
@@ -20,22 +21,57 @@ interface Props {
   disciplineName: string;
 }
 
-type Tab = 'text' | 'csv';
+type Tab = 'text' | 'csv' | 'xlsx';
 
 export function ImportDrawer({ open, onClose, disciplineId, disciplineName }: Props) {
-  const [tab, setTab] = useState<Tab>('text');
+  const [tab, setTab] = useState<Tab>('xlsx');
   const [rawText, setRawText] = useState('');
   const [csvText, setCsvText] = useState('');
+  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
+  const [xlsxResult, setXlsxResult] = useState<ParseResult | null>(null);
+  const [xlsxParsing, setXlsxParsing] = useState(false);
+  const [xlsxError, setXlsxError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const { data: allStudents } = useMyStudents();
   const bulkImport = useBulkImportStudents();
 
+  // Parse XLSX assíncrono — só roda quando troca de arquivo
+  useEffect(() => {
+    if (!xlsxFile) {
+      setXlsxResult(null);
+      setXlsxError(null);
+      return;
+    }
+    let cancelled = false;
+    setXlsxParsing(true);
+    setXlsxError(null);
+    parseXlsxStudentsFile(xlsxFile)
+      .then((res) => {
+        if (!cancelled) setXlsxResult(res);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setXlsxError(err instanceof Error ? err.message : 'Falha ao ler XLSX');
+          setXlsxResult(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setXlsxParsing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [xlsxFile]);
+
   const parseResult: ParseResult = useMemo(() => {
+    if (tab === 'xlsx') {
+      return xlsxResult ?? { rows: [], errors: [], duplicatesInInput: [] };
+    }
     const raw = tab === 'text' ? rawText : csvText;
     if (!raw.trim()) return { rows: [], errors: [], duplicatesInInput: [] };
     return tab === 'text' ? parseTextList(raw) : parseCsv(raw);
-  }, [tab, rawText, csvText]);
+  }, [tab, rawText, csvText, xlsxResult]);
 
   const diff: ImportDiff = useMemo(() => {
     if (!allStudents || parseResult.rows.length === 0) {
@@ -105,16 +141,69 @@ export function ImportDrawer({ open, onClose, disciplineId, disciplineName }: Pr
   return (
     <Drawer open={open} onClose={onClose} title={`Importar alunos — ${disciplineName}`} width={640}>
       {/* Tabs */}
-      <div className="sticky top-[56px] z-10 flex gap-1 border-b border-border bg-bg-surface px-6">
-        <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={FileText}>
-          Colar texto
-        </TabButton>
-        <TabButton active={tab === 'csv'} onClick={() => setTab('csv')} icon={Upload}>
-          Enviar CSV
-        </TabButton>
+      <div className="sticky top-[56px] z-10 flex items-center justify-between gap-1 border-b border-border bg-bg-surface px-6">
+        <div className="flex gap-1">
+          <TabButton active={tab === 'xlsx'} onClick={() => setTab('xlsx')} icon={FileSpreadsheet}>
+            XLSX
+          </TabButton>
+          <TabButton active={tab === 'text'} onClick={() => setTab('text')} icon={FileText}>
+            Colar texto
+          </TabButton>
+          <TabButton active={tab === 'csv'} onClick={() => setTab('csv')} icon={Upload}>
+            CSV
+          </TabButton>
+        </div>
+        {tab === 'xlsx' && (
+          <a
+            href="/templates/alunos.xlsx"
+            download="alunos.xlsx"
+            className="inline-flex items-center gap-1.5 text-[11px] text-text-muted hover:text-text"
+          >
+            <Download className="h-3 w-3" />
+            Baixar template
+          </a>
+        )}
       </div>
 
       <div className="space-y-5 px-6 py-6">
+        {tab === 'xlsx' && (
+          <>
+            <p className="text-xs text-text-muted">
+              Suba uma planilha XLSX com a aba <code className="font-mono">Alunos</code> (colunas{' '}
+              <code className="font-mono">name</code>, <code className="font-mono">email</code>{' '}
+              opcional, <code className="font-mono">note</code> opcional). Todos os alunos serão
+              vinculados a <b>{disciplineName}</b>.
+            </p>
+            <div className="rounded-sm border border-dashed border-border bg-bg p-4 text-center">
+              <label htmlFor="xlsx-students-input" className="sr-only">
+                Enviar arquivo XLSX
+              </label>
+              <input
+                id="xlsx-students-input"
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                aria-label="Enviar arquivo XLSX com lista de alunos"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setXlsxFile(f);
+                }}
+                className="block w-full text-xs text-text-muted file:mr-3 file:rounded-sm file:border file:border-border file:bg-bg-surface file:px-3 file:py-1.5 file:text-xs file:text-text hover:file:bg-bg-surface-hi"
+              />
+              {xlsxFile && (
+                <p className="mt-3 font-mono text-[10px] text-text-secondary">
+                  {xlsxFile.name} · {(xlsxFile.size / 1024).toFixed(1)} KB
+                  {xlsxParsing && ' · processando…'}
+                </p>
+              )}
+            </div>
+            {xlsxError && (
+              <AlertBlock kind="danger">
+                <b>Falha ao ler XLSX:</b> {xlsxError}
+              </AlertBlock>
+            )}
+          </>
+        )}
+
         {tab === 'text' && (
           <>
             <p className="text-xs text-text-muted">
