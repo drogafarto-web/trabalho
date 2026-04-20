@@ -1,7 +1,8 @@
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { logger } from '../lib/logger.js';
 import { extractContent } from './extract-content.js';
-import { gradeWithGemini, GradingError } from './gemini-client.js';
+import { buildProvider } from './providers/factory.js';
+import { ProviderError } from './providers/types.js';
 import { computeSimilarityForSubmission } from '../similarity/compute-similarity.js';
 
 /**
@@ -19,25 +20,46 @@ export interface CoreGradingResult {
 
 export async function performGrading(params: {
   submissionId: string;
-  apiKey: string;
   actorUid: string | null; // null = trigger automático
 }): Promise<CoreGradingResult> {
-  const { submissionId, apiKey, actorUid } = params;
+  const { submissionId, actorUid } = params;
   const db = getFirestore();
   const submissionRef = db.collection('submissions').doc(submissionId);
   const startedAt = Date.now();
 
-  // 1. Marca como processando
+  // 1. Constrói o provider ativo (Gemini, Anthropic ou Qwen)
+  const provider = buildProvider();
+
+  if (!provider.isConfigured()) {
+    logger.warn(
+      { submissionId, provider: provider.name },
+      '[grading] provider não configurado, abortando',
+    );
+    await submissionRef.update({
+      status: 'WAITING_FOR_AI',
+      ai: {
+        processedAt: Timestamp.now(),
+        error: `Provider ${provider.name} sem credenciais. Configure no menu /config.`,
+        evaluation: null,
+        extractedText: null,
+        truncationNotice: null,
+      },
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return { ok: false, durationMs: Date.now() - startedAt, errorCode: 'NOT_CONFIGURED' };
+  }
+
+  // 2. Marca como processando
   await submissionRef.update({
     status: 'AI_PROCESSING',
     updatedAt: FieldValue.serverTimestamp(),
   });
 
   try {
-    // 2. Lê submissão
+    // 3. Lê submissão
     const snap = await submissionRef.get();
     if (!snap.exists) {
-      throw new GradingError('UNKNOWN', `Submissão ${submissionId} não encontrada`);
+      throw new ProviderError('UNKNOWN', `Submissão ${submissionId} não encontrada`);
     }
     const submission = snap.data() as {
       disciplineId: string;
@@ -45,13 +67,13 @@ export async function performGrading(params: {
       file: { storagePath: string; mimeType: string };
     };
 
-    // 3. Lê disciplina (com rubrica snapshot)
+    // 4. Lê disciplina (com rubrica snapshot)
     const disciplineSnap = await db
       .collection('disciplines')
       .doc(submission.disciplineId)
       .get();
     if (!disciplineSnap.exists) {
-      throw new GradingError('UNKNOWN', 'Disciplina não existe mais');
+      throw new ProviderError('UNKNOWN', 'Disciplina não existe mais');
     }
     const discipline = disciplineSnap.data() as {
       name: string;
@@ -63,15 +85,14 @@ export async function performGrading(params: {
       };
     };
 
-    // 4. Extrai conteúdo do arquivo
+    // 5. Extrai conteúdo do arquivo
     const content = await extractContent({
       storagePath: submission.file.storagePath,
       mimeType: submission.file.mimeType,
     });
 
-    // 5. Chama Gemini
-    const result = await gradeWithGemini({
-      apiKey,
+    // 6. Chama o provider ativo
+    const result = await provider.grade({
       ctx: {
         disciplineName: discipline.name,
         course: discipline.course,
@@ -159,7 +180,7 @@ export async function performGrading(params: {
       finalScore: result.evaluation.avaliacao['nota_final'],
     };
   } catch (err) {
-    const errorCode = err instanceof GradingError ? err.code : 'UNKNOWN';
+    const errorCode = err instanceof ProviderError ? err.code : 'UNKNOWN';
     const errorMessage = err instanceof Error ? err.message : String(err);
 
     logger.error(

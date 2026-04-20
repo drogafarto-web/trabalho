@@ -6,7 +6,30 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from '../lib/logger.js';
 import { performGrading } from './grade-submission-core.js';
 
+/**
+ * Todos os secrets são opcionais — o deploy não bloqueia se nenhum
+ * estiver setado. Em runtime, o provider factory verifica se o
+ * secret do provider ativo está presente; se não, retorna erro
+ * amigável "provider não configurado".
+ *
+ * Isso permite deployar o app sem chaves e configurar depois via
+ * Fase 9 (UI /config) ou CLI.
+ */
+/**
+ * Estratégia de secrets:
+ * - GEMINI_API_KEY: declarado via defineSecret — deploy exige que exista
+ *   (o user já criou via `firebase functions:secrets:set`).
+ * - Demais (GEMINI_MODEL, ANTHROPIC_*, QWEN_*, AI_PROVIDER): não
+ *   declarados aqui. Se o user quiser ativar outro provider, precisa:
+ *     1. Criar o secret via CLI
+ *     2. Adicionar à lista abaixo
+ *     3. Redeploy
+ *   Ou esperar a Fase 9 (UI /config) que automatiza isso.
+ */
 const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
+
+const ALL_SECRETS = [GEMINI_API_KEY];
+
 const REGION = 'southamerica-east1';
 
 // ===========================================================================
@@ -16,7 +39,7 @@ export const onSubmissionCreated = onDocumentCreated(
   {
     document: 'submissions/{submissionId}',
     region: REGION,
-    secrets: [GEMINI_API_KEY],
+    secrets: ALL_SECRETS,
     timeoutSeconds: 300,
     memory: '1GiB',
   },
@@ -38,7 +61,6 @@ export const onSubmissionCreated = onDocumentCreated(
 
     await performGrading({
       submissionId,
-      apiKey: GEMINI_API_KEY.value(),
       actorUid: null, // system
     });
   },
@@ -55,7 +77,7 @@ const CallableInput = z.object({
 export const gradeSubmission = onCall(
   {
     region: REGION,
-    secrets: [GEMINI_API_KEY],
+    secrets: ALL_SECRETS,
     timeoutSeconds: 300,
     memory: '1GiB',
   },
@@ -107,14 +129,19 @@ export const gradeSubmission = onCall(
       });
     }
 
-    // 6. Executa o grading
+    // 6. Executa o grading (provider é determinado pelo env AI_PROVIDER)
     const result = await performGrading({
       submissionId,
-      apiKey: GEMINI_API_KEY.value(),
       actorUid: request.auth.uid,
     });
 
     if (!result.ok) {
+      if (result.errorCode === 'NOT_CONFIGURED') {
+        throw new HttpsError(
+          'failed-precondition',
+          'Nenhum provider de IA configurado. Acesse /config para configurar.',
+        );
+      }
       throw new HttpsError(
         'internal',
         `Falha ao processar: ${result.errorCode ?? 'UNKNOWN'}`,
