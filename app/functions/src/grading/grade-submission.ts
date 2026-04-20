@@ -80,12 +80,7 @@ export const gradeSubmission = onCall(
     secrets: ALL_SECRETS,
     timeoutSeconds: 300,
     memory: '1GiB',
-    cors: [
-      /trabalhos-e0647\.web\.app$/,
-      /trabalhos-e0647\.firebaseapp\.com$/,
-      /localhost:\d+$/,
-      /127\.0\.0\.1:\d+$/,
-    ],
+    cors: true,
   },
   async (request) => {
     // 1. Auth: só professor

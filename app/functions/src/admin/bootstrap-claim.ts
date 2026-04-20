@@ -19,12 +19,7 @@ import { logger } from '../lib/logger.js';
 export const bootstrapProfessorClaim = onCall(
   {
     region: 'southamerica-east1',
-    cors: [
-      /trabalhos-e0647\.web\.app$/,
-      /trabalhos-e0647\.firebaseapp\.com$/,
-      /localhost:\d+$/,
-      /127\.0\.0\.1:\d+$/,
-    ],
+    cors: true,
   },
   async (request) => {
     if (!request.auth) {
